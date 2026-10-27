@@ -18,6 +18,8 @@ import android.speech.SpeechRecognizer
 class ContinuousListener(
     context: Context,
     private val listener: Listener,
+    /** BCP-47 tag such as "hi-IN", or null for the phone's language. */
+    private val language: () -> String? = { null },
 ) {
     interface Listener {
         /** Live words of the sentence currently being spoken. */
@@ -73,6 +75,7 @@ class ContinuousListener(
                     putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                     putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
                     putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+                    language()?.let { putExtra(RecognizerIntent.EXTRA_LANGUAGE, it) }
                     // Ask for longer sessions; many phones ignore these, which is fine.
                     putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 4000L)
                     putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 4000L)

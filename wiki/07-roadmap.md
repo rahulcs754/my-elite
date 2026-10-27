@@ -6,7 +6,8 @@
 | 2 | Camera, gallery, battery actions | Done (code) |
 | – | In-app API key entry | Done |
 | – | Conversation Coach ("Elite Elite") | Done (code) |
-| – | APK build | Blocked here; see [Building the APK](04-building-the-apk.md) |
-| 3 | Read notifications aloud | Next: `NotificationListenerService` + user grant in settings |
-| 3 | Set alarms | Next: `AlarmClock.ACTION_SET_ALARM`, tag with time argument |
+| – | APK build | GitHub Actions on rahulcs754/my-elite; see [Building the APK](04-building-the-apk.md) |
+| – | Web answers, open apps, Hindi voice, streamed replies, calls/WhatsApp, camera vision | Done (code); see [New features](09-new-features.md) |
+| 3 | Read notifications aloud | Done (code) |
+| 3 | Set alarms and timers | Done (code) |
 | 3 | Check location | Next: Fused Location Provider, `ACCESS_FINE_LOCATION`, reverse geocode to speak the place |

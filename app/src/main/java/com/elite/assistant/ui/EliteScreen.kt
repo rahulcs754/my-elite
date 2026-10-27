@@ -45,6 +45,7 @@ fun EliteScreen(
     onCoachToggle: (Boolean) -> Unit,
     onSpeakSuggestion: () -> Unit,
     onDismissSuggestion: () -> Unit,
+    onLanguageTapped: () -> Unit,
 ) {
     // Keep the screen awake while coaching, since coach mode stops when the app leaves the screen.
     val view = LocalView.current
@@ -70,6 +71,16 @@ fun EliteScreen(
             )
             .safeDrawingPadding(),
     ) {
+        Text(
+            text = "LANG: ${state.language.label}",
+            color = EliteColors.TextMuted,
+            fontSize = 12.sp,
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .clickable(onClick = onLanguageTapped)
+                .padding(16.dp),
+        )
         Text(
             text = "KEY",
             color = EliteColors.TextMuted,

@@ -12,3 +12,4 @@ Research notes and decisions behind the Elite Android assistant.
 | [Claude API notes](06-claude-api-notes.md) | Model, effort, fallbacks, conversation memory rules |
 | [Roadmap](07-roadmap.md) | What's done and what's next (Phase 3) |
 | [Feature ideas](08-feature-ideas.md) | Ranked list of 18 new features with value and effort |
+| [New features](09-new-features.md) | The 7 features built on 2026-10-27 and how to use them |

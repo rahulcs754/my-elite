@@ -12,70 +12,97 @@ import java.util.UUID
 /**
  * Wrapper around Android's Text-to-Speech engine so Elite can talk back.
  *
- * [speak] calls [onDone] on the main thread once the sentence has finished (or failed),
- * which is how the voice loop knows when to run follow-up actions.
+ * Sentences can be queued one by one as they stream in ([enqueue]); [whenIdle] runs a
+ * callback once everything queued has been spoken. Hindi (Devanagari) sentences are
+ * spoken with a Hindi voice, everything else with an Indian English voice when available.
  */
 class SpeechOutput(context: Context) {
 
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val pending = mutableMapOf<String, () -> Unit>()
+    private val lock = Any()
+    /** Utterances queued but not finished yet. IDs (not a counter) so a late callback from a
+     *  stopped utterance can't be mistaken for a new one. */
+    private val outstanding = mutableSetOf<String>()
+    private var idleCallback: (() -> Unit)? = null
     private var ready = false
     private var failed = false
-    private var queuedBeforeReady: Triple<String, Float, () -> Unit>? = null
+    private val queuedBeforeReady = mutableListOf<Pair<String, Float>>()
+    private var waitingBeforeReady = 0
 
     private val tts: TextToSpeech = TextToSpeech(context.applicationContext) { status ->
         ready = status == TextToSpeech.SUCCESS
         failed = !ready
         if (ready) configure()
         // Speak anything requested while the engine was still starting up.
-        queuedBeforeReady?.let { (text, volume, done) ->
-            queuedBeforeReady = null
-            if (ready) speak(text, volume, done) else done()
+        val pending = synchronized(lock) {
+            waitingBeforeReady = 0
+            queuedBeforeReady.toList().also { queuedBeforeReady.clear() }
         }
+        if (ready) pending.forEach { (text, volume) -> enqueue(text, volume) }
+        fireIdleIfDone()
     }
 
     private fun configure() {
-        val result = tts.setLanguage(Locale.getDefault())
-        if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-            tts.setLanguage(Locale.US)
-        }
         // Slightly lower pitch and calm rate for an "AI butler" feel. Tweak to taste.
         tts.setPitch(0.9f)
         tts.setSpeechRate(1.0f)
-
         tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) = Unit
-            override fun onDone(utteranceId: String?) = finish(utteranceId)
+            override fun onDone(utteranceId: String?) = finishOne(utteranceId)
             @Deprecated("Deprecated in Java")
-            override fun onError(utteranceId: String?) = finish(utteranceId)
-            override fun onError(utteranceId: String?, errorCode: Int) = finish(utteranceId)
-            override fun onStop(utteranceId: String?, interrupted: Boolean) = finish(utteranceId)
+            override fun onError(utteranceId: String?) = finishOne(utteranceId)
+            override fun onError(utteranceId: String?, errorCode: Int) = finishOne(utteranceId)
+            override fun onStop(utteranceId: String?, interrupted: Boolean) = Unit
         })
     }
 
     /**
-     * Speaks [text]. [volume] is 0..1 relative to the media volume; Coach mode uses a low
-     * value so the suggestion is a whisper the other person barely hears.
+     * Adds [text] to the speech queue. [volume] is 0..1 relative to media volume; Coach mode
+     * uses a low value so the suggestion is a whisper.
      */
-    fun speak(text: String, volume: Float = 1f, onDone: () -> Unit = {}) {
-        if (failed) {
-            // No voice engine on this phone: skip speech but keep the loop moving.
-            mainHandler.post(onDone)
-            return
-        }
-        if (!ready) {
-            queuedBeforeReady = Triple(text, volume, onDone)
-            return
+    fun enqueue(text: String, volume: Float = 1f) {
+        if (text.isBlank()) return
+        if (failed) return                            // no voice engine: stay silent
+        synchronized(lock) {
+            if (!ready) {
+                queuedBeforeReady += text to volume
+                waitingBeforeReady++
+                return
+            }
         }
         val id = UUID.randomUUID().toString()
-        synchronized(pending) { pending[id] = onDone }
+        synchronized(lock) { outstanding += id }
+        tts.language = localeFor(text)
         val params = Bundle().apply { putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume) }
-        tts.speak(text, TextToSpeech.QUEUE_FLUSH, params, id)
+        if (tts.speak(text, TextToSpeech.QUEUE_ADD, params, id) != TextToSpeech.SUCCESS) finishOne(id)
     }
 
-    /** Interrupt speech immediately (e.g. the user tapped the mic again). */
+    /** Runs [onDone] on the main thread once everything queued so far has been spoken. */
+    fun whenIdle(onDone: () -> Unit) {
+        synchronized(lock) { idleCallback = onDone }
+        fireIdleIfDone()
+    }
+
+    /** Interrupts speech now and drops the queue; a pending [whenIdle] callback still runs. */
     fun stop() {
-        tts.stop()
+        if (ready) tts.stop()
+        synchronized(lock) {
+            outstanding.clear()
+            queuedBeforeReady.clear()
+            waitingBeforeReady = 0
+        }
+        fireIdleIfDone()
+    }
+
+    /** Replace whatever is playing with [text], then call [onDone]. */
+    fun speak(text: String, volume: Float = 1f, onDone: () -> Unit = {}) {
+        if (ready) tts.stop()
+        synchronized(lock) {
+            outstanding.clear()
+            idleCallback = null
+        }
+        enqueue(text, volume)
+        whenIdle(onDone)
     }
 
     fun shutdown() {
@@ -83,8 +110,23 @@ class SpeechOutput(context: Context) {
         tts.shutdown()
     }
 
-    private fun finish(utteranceId: String?) {
-        val callback = synchronized(pending) { pending.remove(utteranceId) } ?: return
+    private fun finishOne(utteranceId: String?) {
+        synchronized(lock) { outstanding.remove(utteranceId) }
+        fireIdleIfDone()
+    }
+
+    private fun fireIdleIfDone() {
+        val callback = synchronized(lock) {
+            if (outstanding.isEmpty() && waitingBeforeReady == 0) idleCallback.also { idleCallback = null } else null
+        } ?: return
         mainHandler.post(callback)
+    }
+
+    /** Devanagari text gets a Hindi voice; everything else Indian English (or the phone default). */
+    private fun localeFor(text: String): Locale {
+        val hindi = text.any { it in 'ऀ'..'ॿ' }
+        val wanted = if (hindi) Locale("hi", "IN") else Locale("en", "IN")
+        val ok = tts.isLanguageAvailable(wanted) >= TextToSpeech.LANG_AVAILABLE
+        return if (ok) wanted else Locale.getDefault()
     }
 }

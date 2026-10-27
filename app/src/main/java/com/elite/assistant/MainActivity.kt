@@ -9,15 +9,19 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.elite.assistant.ui.EliteScreen
 import com.elite.assistant.ui.theme.EliteTheme
+import java.io.File
 
 /**
- * Single-screen app. Asks for the microphone on first tap, then hands every tap
- * to [EliteViewModel], which runs the voice loop.
+ * Single-screen app. Handles everything that needs an Activity: runtime permissions
+ * and the camera for "what is this?" questions. Every tap goes to [EliteViewModel].
  */
 class MainActivity : ComponentActivity() {
 
@@ -41,6 +45,30 @@ class MainActivity : ComponentActivity() {
                 ) { granted ->
                     if (granted) viewModel.setCoachMode(true) else viewModel.onMicPermissionDenied()
                 }
+                // Other permissions Elite asks for mid-conversation (e.g. contacts for calls).
+                val actionPermission = rememberLauncherForActivityResult(
+                    ActivityResultContracts.RequestPermission(),
+                    viewModel::onPermissionResult,
+                )
+                LaunchedEffect(state.permissionRequest) {
+                    state.permissionRequest?.let { actionPermission.launch(it) }
+                }
+
+                // Camera for LOOK: the photo goes to a private cache file and is deleted after use.
+                val photoFile = remember { File(cacheDir, "look/look.jpg") }
+                val takePhoto = rememberLauncherForActivityResult(
+                    ActivityResultContracts.TakePicture()
+                ) { saved -> viewModel.onPhotoResult(saved, photoFile) }
+                LaunchedEffect(state.photoRequest) {
+                    if (state.photoRequest) {
+                        viewModel.onPhotoRequestHandled()
+                        photoFile.parentFile?.mkdirs()
+                        val uri = FileProvider.getUriForFile(
+                            this@MainActivity, "$packageName.fileprovider", photoFile
+                        )
+                        takePhoto.launch(uri)
+                    }
+                }
 
                 EliteScreen(
                     state = state,
@@ -55,6 +83,7 @@ class MainActivity : ComponentActivity() {
                     },
                     onSpeakSuggestion = viewModel::speakSuggestionSoftly,
                     onDismissSuggestion = viewModel::dismissSuggestion,
+                    onLanguageTapped = viewModel::cycleLanguage,
                 )
             }
         }

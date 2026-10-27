@@ -2,7 +2,7 @@
 
 What other assistants do (Google Assistant/Gemini, Alexa, Siri) compared with what Elite can do,
 mapped to the Android API each idea needs. Sources: Android platform APIs Elite already targets
-(API 26–35) and the Claude API's built-in tools. Nothing here has been built yet.
+(API 26–35) and the Claude API's built-in tools. Items 1–7 were built on 2026-10-27; see [New features](09-new-features.md).
 
 **Value:** how much it changes daily use. **Effort:** S = a few hours, M = a day or two, L = several days.
 

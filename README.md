@@ -12,6 +12,10 @@ custom platform-channel code anyway, so Kotlin is less work for this scope.
 - **Conversation Coach:** tap CONVERSATION COACH, talk with someone, say "Elite Elite" (or tap the core)
   and Elite shows a good reply to say. A red banner shows it's listening; it stops when you leave the app.
 
+- Ask about anything current (web search), "open YouTube", "wake me at 6:30", "timer 10 minutes",
+  "call Mom", "WhatsApp Rahul I'm late", "what did I miss?", "what is this?" (camera). Speak Hindi,
+  English or Hinglish; tap **LANG** to set what the recogniser listens for. Details: [wiki/09-new-features.md](wiki/09-new-features.md).
+
 More background and decisions: see the [wiki](wiki/README.md).
 
 ## Setup, step by step

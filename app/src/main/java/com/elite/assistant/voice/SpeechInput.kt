@@ -15,6 +15,8 @@ import android.speech.SpeechRecognizer
 class SpeechInput(
     context: Context,
     private val listener: Listener,
+    /** BCP-47 tag such as "hi-IN", or null for the phone's language. Read on each start. */
+    private val language: () -> String? = { null },
 ) {
     interface Listener {
         /** Words recognised so far, updated live while the user talks. */
@@ -65,8 +67,7 @@ class SpeechInput(
         putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
         putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
         putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-        // Uses the phone's language by default. To force one, add:
-        // putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-IN")
+        language()?.let { putExtra(RecognizerIntent.EXTRA_LANGUAGE, it) }
     }
 
     private val callbacks = object : RecognitionListener {
