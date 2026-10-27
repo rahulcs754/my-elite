@@ -1,0 +1,8 @@
+<resources>
+    <!-- Dark, edge-to-edge window; Compose draws everything else. -->
+    <style name="Theme.Elite" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/elite_bg</item>
+        <item name="android:statusBarColor">@color/elite_bg</item>
+        <item name="android:navigationBarColor">@color/elite_bg</item>
+    </style>
+</resources>
